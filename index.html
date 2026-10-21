@@ -738,7 +738,7 @@ function sheetOfferView(){
     </dl>
     ${block('Ключевое действие',o.action||t.hint)}
     ${block('Условия',o.terms)}
-    ${o.rko?.kind==='cpa'&&!o.rko.detailed?`<p class="note" id="rkoDet">${rkoReady()?'Загружаю описание и ссылки из RKO Group…':'Описание и ссылки подтянутся из RKO Group в версии на GitHub.'}</p>`:''}
+    ${o.rko?.kind==='cpa'&&!o.rko.detailed?`<p class="note" id="rkoDet">${rkoReady()?'Загружаю описание и ссылки из RKO Group…':store?.local?'Описание и ссылки подтянутся при следующем обновлении RKO Group.':'Описание и ссылки подтянутся из RKO Group в версии на GitHub.'}</p>`:''}
     <section class="block"><h4>${links.length>1?'Ссылки для привлечения':'Ссылка для привлечения'}</h4>${links.length?`<div class="links">${links.map((l,i)=>`<div class="linkbox">${l.title?`<span class="note">${esc(l.title)}</span>`:''}<input id="ovUrl-${i}" readonly value="${esc(l.url)}" aria-label="Ссылка для привлечения"><div class="actions"><a class="btn black" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">Открыть</a><button class="btn" type="button" data-a="copy" data-i="${i}">Скопировать</button></div></div>`).join('')}</div>`:'<p class="note">Ссылки пока нет. Добавьте её через «Изменить».</p>'}</section>
     ${block('Заметки',o.notes)}
     ${ministats(list)}
@@ -908,9 +908,23 @@ function cpaRate(u){
     action:acts.map(a=>{const r=a.reward_type==='percent'?`${Number(a.reward)}%`:(Number(a.reward)?fmt(a.reward):'');
       return `${String(a.target_action?.title||'Целевое действие').trim()}${a.is_required===false?' (доп.)':''}${r?' — '+r:''}`}).join('\n')};
 }
-async function syncOffers(){
+/* источник офферов: живой API по ключу или файл, который раз в 3 часа выгружает GitHub Actions */
+const RKO_FILE='data/rko.json';
+const liveSrc={
+  list:()=>rkoAll('/offer/list',{filter:{state:{open:true,paused:true,archived:false}},order:{name:'created_at',direction:'desc'}}),
+  products:async()=>{try{return await rko('/offer-ag/products')}catch(e){if(e.code===403)return null;throw e}},
+  ag:async pid=>{try{return await rko('/offer-ag/offers',{body:{product_id:pid}})}catch(e){if([403,404,422].includes(e.code))return null;throw e}},
+  detail:()=>null
+};
+const fileSrc=d=>({list:async()=>d.offers||[],products:async()=>d.products||null,ag:async pid=>d.ag?.[pid]||null,detail:uuid=>d.details?.[uuid]||null});
+function detailFields(dt,base){
+  const f={terms:[richText(dt.short_description),richText(dt.description),base,dt.forbidden?.length?`Запрещено в рекламе: ${dt.forbidden.join(', ')}`:''].filter(Boolean).join('\n\n'),links:dt.links||[]};
+  if(dt.links?.length)f.url=dt.links[0].url;
+  return f;
+}
+async function syncOffers(src=liveSrc){
   const ups=[];
-  const cpa=await rkoAll('/offer/list',{filter:{state:{open:true,paused:true,archived:false}}});
+  const cpa=[...new Map((await src.list()).map(o=>[o.uuid,o])).values()];
   const cpaIds=new Set(cpa.map(o=>o.uuid));
   const betMain=new Set(cpa.filter(o=>CAT_RX[3][1].test(o.category?.title||'')).map(o=>o.category?.main_id).filter(v=>v!=null));
   for(const o of cpa){
@@ -918,23 +932,24 @@ async function syncOffers(){
     const id='rko-'+o.uuid,cur=offerById(id);
     const cat=cur?'':catFor(o.category?.title)||(betMain.has(o.category?.main_id)&&catById('bet')?'bet':'');
     if(!cur&&!cat)continue;
-    const r=cpaRate(o.user_rate),cf=o.configuration||{};
-    const data={name:String(o.title||'Оффер').trim(),status:o.state==='open'?'active':'paused',payout:r.payout,payoutSign:r.sign,payoutBase:r.base,action:r.action,
-      hold:cf.hold_days!=null?days(cf.hold_days):'',network:['RKO Group · CPA',o.advertiser?.title].filter(Boolean).join(' · '),
-      rko:{kind:'cpa',uuid:o.uuid,detailed:!!cur?.rko?.detailed}};
-    if(!cur?.rko?.detailed)data.terms=[o.access_level==='requested_approval'?'Нужно запросить доступ к офферу в кабинете RKO Group.':'',
+    const r=cpaRate(o.user_rate),cf=o.configuration||{},dt=src.detail(o.uuid);
+    const base=[o.access_level==='requested_approval'?'Нужно запросить доступ к офферу в кабинете RKO Group.':'',
       cf.max_processing_days?`Рекламодатель обрабатывает заявку до ${days(cf.max_processing_days)}.`:'',
       cf.cookie_ttl_days?`Cookie живёт ${days(cf.cookie_ttl_days)}.`:''].filter(Boolean).join('\n');
+    const data={name:String(o.title||'Оффер').trim(),status:o.state==='open'?'active':'paused',payout:r.payout,payoutSign:r.sign,payoutBase:r.base,action:r.action,
+      hold:cf.hold_days!=null?days(cf.hold_days):'',network:['RKO Group · CPA',o.advertiser?.title].filter(Boolean).join(' · '),
+      rko:{kind:'cpa',uuid:o.uuid,detailed:!!dt||!!cur?.rko?.detailed}};
+    if(dt)Object.assign(data,detailFields(dt,base));
+    else if(!cur?.rko?.detailed)data.terms=base;
     ups.push({id,data,init:cur?{}:{cat,days:'',url:'',notes:'',createdAt:Date.now()}});
   }
-  let prods=null;
-  try{prods=await rko('/offer-ag/products')}catch(e){if(e.code!==403)throw e}
+  const prods=await src.products();
   for(const p of prods?[...(prods.banks||[]),...(prods.others||[])]:[]){
     if(p.external_url)continue;
     const pcat=catFor(p.short_title)||catFor(p.title)||(/^rko$/i.test(p.alias||'')&&catById('rko')?'rko':'');
     if(!pcat&&!offers.some(o=>o.rko?.kind==='ag'&&o.rko.product===p.id))continue;
-    let d;try{d=await rko('/offer-ag/offers',{body:{product_id:p.id}})}catch(e){if([403,404,422].includes(e.code))continue;throw e}
-    for(const g of d?.groups||[])for(const x of g.offers||[]){
+    const d=await src.ag(p.id);if(!d)continue;
+    for(const g of d.groups||[])for(const x of g.offers||[]){
       const ext=x.external_link?.enabled?String(x.external_link.url||''):'';
       if([...cpaIds].some(u=>ext.includes(u)))continue;
       const id=`rkoag-${p.id}-${g.bank?.id}-${x.channel?.id??0}-${x.company_type??0}-${hash(x.label)}`,cur=offerById(id);
@@ -954,6 +969,17 @@ async function syncOffers(){
   await store.upsertMany('offers',ups);
   return ups.length;
 }
+async function rkoFileSync(force){
+  if(!store?.local||rkoKey()||rkoSyncing)return;
+  let d;
+  try{const r=await fetch(RKO_FILE+'?v='+Math.floor(Date.now()/6e5),{cache:'no-store'});if(!r.ok)return;d=await r.json()}catch(e){return}
+  if(!d?.at||(!force&&d.at===rkoState().fileAt))return;
+  rkoSyncing=true;setRkoMsg('загружаю офферы…');
+  try{const n=await syncOffers(fileSrc(d));rkoSave({fileAt:d.at,error:''});toast(`RKO Group: офферов ${n}`)}
+  catch(e){rkoSave({error:e?.message||'Не удалось загрузить офферы'})}
+  finally{rkoSyncing=false;rkoMsg='';renderRko();render()}
+}
+const when=iso=>{const d=new Date(iso);return isNaN(d)?'—':d.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})};
 async function syncRequests(){
   const items=await rkoAll('/request/list',{filter:{sort:{field:'created_at',direction:'desc'}}});
   const ups=items.map(q=>{
@@ -996,20 +1022,21 @@ async function maybeDetail(o){
     for(const l of d?.landings||[]){
       try{const g=await rko(`/offer/get-links?o=${encodeURIComponent(o.rko.uuid)}&l=${encodeURIComponent(l.uuid)}`);if(g?.short)links.push({title:l.title||'',url:g.short})}catch(e){}
     }
-    const forb=(d?.words?.forbidden||[]).map(w=>w.word).filter(Boolean);
-    const terms=[richText(d?.short_description),richText(d?.description),o.terms,forb.length?`Запрещено в рекламе: ${forb.join(', ')}`:''].filter(Boolean).join('\n\n');
-    await store.update('offers',o.id,{terms,links,url:links[0]?.url||o.url||'',rko:{...o.rko,detailed:true}});
+    const dt={short_description:d?.short_description,description:d?.description,forbidden:(d?.words?.forbidden||[]).map(w=>w.word).filter(Boolean),links};
+    await store.update('offers',o.id,{...detailFields(dt,o.terms),rko:{...o.rko,detailed:true}});
   }catch(e){
     rkoDetailFailed.add(o.id);
     const n=$('#rkoDet');if(n)n.textContent='Описание из RKO Group не загрузилось: '+(e?.message||'ошибка');
   }finally{rkoInflight.delete(o.id)}
 }
 function renderRkoBars(){
-  const show=rkoReady(),st=rkoState();
+  const st=rkoState(),loc=!!store?.local,key=!!rkoKey();
   for(const [sel,act] of [['#rkoBarC','sync-req'],['#rkoBarO','sync-off']]){
-    const el=$(sel);el.hidden=!show;if(!show)continue;
+    const el=$(sel),show=loc&&(key||(act==='sync-off'&&!!st.fileAt));
+    el.hidden=!show;if(!show)continue;
     const bal=act==='sync-req'&&st.balance&&!rkoMsg?` · на балансе ${money(st.balance.balance_rubles)}, в холде ${money(st.balance.balance_hold_rubles)}`:'';
-    el.innerHTML=`<span class="rk-t"><b>RKO Group</b> · ${esc(rkoMsg||st.error||(st.at?'обновлено '+ago(st.at):'ещё не загружено'))}${bal}</span><button class="btn sm" type="button" data-rko="${act}"${rkoSyncing?' disabled':''}>Обновить</button>`;
+    const def=key?(st.at?'обновлено '+ago(st.at):'ещё не загружено'):`данные от ${when(st.fileAt)}, обновляются сами`;
+    el.innerHTML=`<span class="rk-t"><b>RKO Group</b> · ${esc(rkoMsg||st.error||def)}${bal}</span><button class="btn sm" type="button" data-rko="${key?act:'file'}"${rkoSyncing?' disabled':''}>Обновить</button>`;
   }
 }
 function renderRko(){
@@ -1017,7 +1044,8 @@ function renderRko(){
   p.hidden=!store;if(!store)return;
   let h='<h2>RKO Group</h2>';
   if(!store.local)h+='<p class="note">Подключение к RKO Group работает в версии трекера на GitHub. Внутри Claude страницам закрыты запросы к другим сайтам.</p>';
-  else if(!rkoKey())h+=`<p class="note">Подключите API, и трекер сам подтянет офферы со ставками, условиями и ссылками, ваши заявки со статусами и выплатами, баланс.</p>
+  else if(!rkoKey())h+=`${st.fileAt?`<p class="note">Офферы RKO Group со ставками, условиями и ссылками уже подтягиваются сами, данные от ${when(st.fileAt)}. Ключ нужен, только чтобы видеть баланс и свои заявки.</p>`
+      :'<p class="note">Подключите API, и трекер сам подтянет офферы со ставками, условиями и ссылками, ваши заявки со статусами и выплатами, баланс.</p>'}
     <p class="note">Офферы берутся только по вашим категориям: РКО, дебетовые и кредитные карты, букмекеры. Нужны другие, например «Микрозаймы»? Добавьте категорию с тем же названием, как в RKO Group.</p>
     <label class="f">API-ключ<input id="rkoKeyIn" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="rkoa_…"></label>
     <p class="err" id="rkoErr"></p>
@@ -1050,6 +1078,7 @@ document.addEventListener('click',e=>{
   else if(a==='sync')rkoSync();
   else if(a==='sync-req')rkoSync(['requests','balance']);
   else if(a==='sync-off')rkoSync(['offers']);
+  else if(a==='file')rkoFileSync(true);
   else if(a==='disconnect'){
     if(!b.dataset.sure){b.dataset.sure='1';b.textContent='Точно отключить?';return}
     rkoSetKey('');rkoSave({},true);renderRko();render();toast('RKO Group отключён, загруженные данные остались');
@@ -1179,7 +1208,8 @@ function start(s){
   if(tab==='setup')renderSetup();
   renderRko();render();
   const st=rkoState();
-  if(rkoReady()&&(!st.at||Date.now()-st.at>15*6e4))rkoSync(st.at?['requests','balance']:undefined);
+  if(rkoReady()){if(!st.at||Date.now()-st.at>15*6e4)rkoSync(st.at?['requests','balance']:undefined)}
+  else rkoFileSync();
 }
 setTab(location.hash.slice(1));
 (async()=>{

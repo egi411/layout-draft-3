@@ -35,7 +35,9 @@ async function pool(items, n, fn) {
 
 const prev = JSON.parse(await readFile(OUT, 'utf8').catch(() => '{}'));
 const now = Date.now();
-const offers = (await all('/offer/list', {filter: {state: {open: true, paused: true, archived: false}}}))
+// без явной сортировки страницы списка пересекаются: одни офферы приходят дважды, другие теряются
+const list = await all('/offer/list', {filter: {state: {open: true, paused: true, archived: false}}, order: {name: 'created_at', direction: 'desc'}});
+const offers = [...new Map(list.map(o => [o.uuid, o])).values()]
   .filter(o => o.user_rate)
   .map(o => ({uuid: o.uuid, title: o.title, category: {title: o.category?.title, main_id: o.category?.main_id}, state: o.state,
     configuration: o.configuration, access_level: o.access_level, advertiser: {title: o.advertiser?.title}, user_rate: o.user_rate}));

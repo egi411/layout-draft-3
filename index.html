@@ -173,7 +173,7 @@ button.card{width:100%;text-align:left;color:inherit;font:inherit}
 /* формы */
 .form{display:grid;gap:12px}
 .form fieldset{border:0;margin:0;padding:0;display:grid;gap:12px;min-width:0}
-label.f{display:grid;gap:6px;font-size:13px;color:var(--muted);font-weight:600;min-width:0}
+label.f,.fgroup{display:grid;gap:6px;font-size:13px;color:var(--muted);font-weight:600;min-width:0}
 .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .typepick{display:flex;flex-wrap:wrap;gap:8px}
 .typepick label{--c:var(--ink);display:flex;align-items:center;gap:8px;padding:10px 14px;min-height:44px;border-radius:12px;background:var(--soft);font-weight:700;font-size:14px;cursor:pointer;border:2px solid transparent}
@@ -345,6 +345,8 @@ const LATE_BEFORE=5;
 const TABS={clients:'Клиенты',offers:'Офферы',team:'Команда',setup:'Настройки'};
 const LAST_PERSON='offers-tracker:lastPerson';
 const DEFAULT_PEOPLE=['Егор','Даня'];
+const DEFAULT_PARTNERS=['RKO Group'], LAST_NET='offers-tracker:lastNet', SEEDED='offers-tracker:seeded';
+const partnerList=()=>[...new Set([...DEFAULT_PARTNERS,...offers.map(o=>String(o.network||'').trim()).filter(Boolean)])];
 const ICONS={
   bank:['Счёт','<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3 13h18M11 13v2h2v-2"/>'],
   card:['Дебетовая карта','<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/>'],
@@ -708,7 +710,7 @@ function sheetOfferView(){
   $('#sheetTitle').textContent='Оффер';
   if(!o){$('#sheetBody').innerHTML='<p class="note">Загружаю оффер…</p>';$('#sheetFoot').innerHTML='<button class="btn" type="button" data-close>Закрыть</button>';return}
   const t=catOfOffer(o),paused=o.status==='paused',list=offerClients(o);
-  const links=(Array.isArray(o.links)&&o.links.length?o.links:[{title:'',url:o.url}]).map(l=>({title:String(l.title||''),url:linkOf(l.url)})).filter(l=>l.url);
+  const links=[['Наш сайт',o.site],['Партнёрская ссылка',o.url]].map(([title,u])=>({title,url:linkOf(u)})).filter(l=>l.url);
   $('#sheetBody').innerHTML=`<div class="ohero grad" style="${cvar(t)}">
       <div class="row"><span class="badge">${esc(catName(t))}</span><span class="badge">${paused?'На паузе':'Активен'}</span></div>
       <h3>${esc(o.name)||'Без названия'}</h3>
@@ -721,7 +723,7 @@ function sheetOfferView(){
     </dl>
     ${block('Ключевое действие',o.action||t.hint)}
     ${block('Условия',o.terms)}
-    <section class="block"><h4>${links.length>1?'Ссылки для привлечения':'Ссылка для привлечения'}</h4>${links.length?`<div class="links">${links.map((l,i)=>`<div class="linkbox">${l.title?`<span class="note">${esc(l.title)}</span>`:''}<input id="ovUrl-${i}" readonly value="${esc(l.url)}" aria-label="Ссылка для привлечения"><div class="actions"><a class="btn black" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">Открыть</a><button class="btn" type="button" data-a="copy" data-i="${i}">Скопировать</button></div></div>`).join('')}</div>`:'<p class="note">Ссылки пока нет. Добавьте её через «Изменить».</p>'}</section>
+    <section class="block"><h4>Ссылки</h4>${links.length?`<div class="links">${links.map((l,i)=>`<div class="linkbox">${l.title?`<span class="note">${esc(l.title)}</span>`:''}<input id="ovUrl-${i}" readonly value="${esc(l.url)}" aria-label="${esc(l.title)}"><div class="actions"><a class="btn black" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">Открыть</a><button class="btn" type="button" data-a="copy" data-i="${i}">Скопировать</button></div></div>`).join('')}</div>`:'<p class="note">Ссылок пока нет. Добавьте их через «Изменить».</p>'}</section>
     ${block('Заметки',o.notes)}
     ${ministats(list)}
     ${list.length?'<button class="btn" type="button" data-a="offer-clients">Показать клиентов оффера</button>':''}`;
@@ -742,6 +744,8 @@ function sheetOffer(){
   const o=sheet.id?offerById(sheet.id):null;
   if(sheet.id&&!o){closeSheet();return}
   const type=o?catOfOffer(o).id:(oCat||cats()[0].id),paused=o?.status==='paused';
+  let last='';try{last=localStorage.getItem(LAST_NET)||''}catch(e){}
+  const net=o?String(o.network||'').trim():(partnerList().includes(last)?last:DEFAULT_PARTNERS[0]);
   $('#sheetTitle').textContent=o?'Изменить оффер':'Новый оффер';
   $('#sheetBody').innerHTML=`<form id="oForm" class="form" novalidate><fieldset${fs()}>
     <label class="f">Название оффера<input id="oName" autocomplete="off" placeholder="Например, РКО для ИП в банке"></label>
@@ -753,13 +757,16 @@ function sheetOffer(){
     <div class="two"><label class="f">Выплата нам, ₽<input id="oPay" type="number" inputmode="numeric" min="0" step="100" placeholder="5000"></label><label class="f">Срок на КД, дней<input id="oDays" type="number" inputmode="numeric" min="1"></label></div>
     <label class="f">Ключевое действие<input id="oKa" autocomplete="off"></label>
     <label class="f">Условия для клиента<textarea id="oTerms" rows="4" placeholder="Кому подходит: возраст, гражданство, регион, новый ли клиент банка, ограничения"></textarea></label>
-    <label class="f">Ссылка, по которой привлекаем<input id="oUrl" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://…"></label>
-    <div class="two"><label class="f">Партнёрка<input id="oNet" autocomplete="off" placeholder="Где взяли оффер"></label><label class="f">Холд выплаты<input id="oHold" autocomplete="off" placeholder="Например, 30 дней"></label></div>
+    <label class="f">Ссылка на наш сайт<input id="oSite" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="http://izum-partners.ru/…"></label>
+    <label class="f">Партнёрская ссылка<input id="oUrl" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://rko-group.ru/s/…"></label>
+    <div class="fgroup">Партнёрка<div class="typepick" role="radiogroup" aria-label="Партнёрка">${partnerList().map(n=>`<label><input type="radio" name="onet" value="${esc(n)}"${n===net?' checked':''}><span class="sw"></span>${esc(n)}</label>`).join('')}<label><input type="radio" name="onet" value="__new"><span class="sw"></span>+ Другая</label></div></div>
+    <label class="f" id="oNetNewWrap" hidden>Название партнёрки<input id="oNetNew" autocomplete="off" placeholder="Например, Leads.su"></label>
+    <label class="f">Холд выплаты<input id="oHold" autocomplete="off" placeholder="Например, 30 дней"></label>
     <label class="f">Заметки<textarea id="oNotes" rows="3" placeholder="Промокод, контакт менеджера, нюансы"></textarea></label>
   </fieldset><p class="err" id="oErr"></p></form>`;
   $('#oName').value=o?.name||'';$('#oPay').value=o?.payout||'';$('#oDays').value=o?.days||'';
   $('#oKa').value=o?.action||'';$('#oTerms').value=o?.terms||'';$('#oUrl').value=o?.url||'';
-  $('#oNet').value=o?.network||'';$('#oHold').value=o?.hold||'';$('#oNotes').value=o?.notes||'';
+  $('#oSite').value=o?.site||'';$('#oHold').value=o?.hold||'';$('#oNotes').value=o?.notes||'';
   offerHints();setFoot();
 }
 function offerHints(){const t=catById(picked('otype'));$('#oDays').placeholder=`как у категории: ${+t?.days||30}`;$('#oKa').placeholder=t?.hint||''}
@@ -774,13 +781,16 @@ async function saveOffer(){
   if(!name){err.textContent='Укажите название оффера.';$('#oName').focus();return}
   const body={name,cat:picked('otype'),status:document.querySelector('input[name=ostatus]:checked')?.value==='paused'?'paused':'active',
     payout:Number($('#oPay').value)||0,days:Number($('#oDays').value)||'',action:$('#oKa').value.trim(),terms:$('#oTerms').value.trim(),
-    url:$('#oUrl').value.trim(),network:$('#oNet').value.trim(),hold:$('#oHold').value.trim(),notes:$('#oNotes').value.trim()};
+    url:$('#oUrl').value.trim(),site:$('#oSite').value.trim(),network:'',hold:$('#oHold').value.trim(),notes:$('#oNotes').value.trim()};
+  const nv=document.querySelector('input[name=onet]:checked')?.value||'';
+  body.network=nv==='__new'?$('#oNetNew').value.trim():nv;
+  if(nv==='__new'&&!body.network){err.textContent='Впишите название партнёрки или выберите из списка.';$('#oNetNew').focus();return}
   const btn=$('#sheetFoot [type=submit]');if(btn)btn.disabled=true;
   try{
     let id=sheet.id;
+    if(body.network)try{localStorage.setItem(LAST_NET,body.network)}catch(e){}
     if(id){
       const old=offerById(id);
-      if(old&&body.url!==(old.url||''))body.links=[];
       if(old&&old.name!==name)for(const r of clients.filter(r=>!r.offerId&&offerOf(r)===old))await store.update('clients',r.id,{offerId:id,offer:name});
       await store.update('offers',id,body);toast('Оффер сохранён');
     }else{id=(await store.add('offers',{...body,createdAt:Date.now()})).id;toast('Оффер добавлен')}
@@ -886,6 +896,7 @@ $('#sheetBody').addEventListener('change',e=>{
   else if(e.target.id==='fOffer')applyOffer();
   else if(e.target.id==='fPerson'){const n=e.target.value==='__new';$('#fPersonNewWrap').hidden=!n;if(n)$('#fPersonNew').focus()}
   else if(e.target.name==='otype')offerHints();
+  else if(e.target.name==='onet'){const n=e.target.value==='__new';$('#oNetNewWrap').hidden=!n;if(n)$('#oNetNew').focus()}
 });
 $('#sheetBody').addEventListener('submit',e=>{
   e.preventDefault();
@@ -942,7 +953,17 @@ function start(s){
   s.onList('offers',l=>{offers=l;loaded.offers=true;render()},fail);
   s.onList('people',l=>{people=l;loaded.people=true;render()},fail);
   if(tab==='setup')renderSetup();
-  if(s.local)dropRko();
+  if(s.local){dropRko();importSeeds()}
+}
+/* офферы с сайта izum-partners.ru: offers.json собирает tools/offers_from_site.py; каждый добавляется один раз, дальше правится в трекере */
+async function importSeeds(){
+  let list=[],done=[];
+  try{const r=await fetch('offers.json?v='+Math.floor(Date.now()/36e5),{cache:'no-store'});if(!r.ok)return;list=(await r.json()).offers||[]}catch(e){return}
+  try{done=JSON.parse(localStorage.getItem(SEEDED)||'[]')}catch(e){}
+  const fresh=list.filter(x=>x?.id&&!done.includes(x.id)&&!offerById(x.id));
+  for(const {id,...d} of fresh)await store.set('offers',id,{...d,createdAt:Date.now()});
+  try{localStorage.setItem(SEEDED,JSON.stringify([...new Set([...done,...list.map(x=>x.id)])]))}catch(e){}
+  if(fresh.length)toast(`Добавлены офферы с сайта: ${fresh.length}`);
 }
 /* RKO Group отключён: стираем сохранённый ключ и всё, что было загружено оттуда в этом браузере */
 async function dropRko(){

@@ -415,6 +415,7 @@ function daysLeft(r){const d=daysSince(r.date);return d==null?null:windowOf(r)-d
 const isLate=r=>{const l=daysLeft(r);return status(r)==='wait'&&l!=null&&l<=LATE_BEFORE};
 const sortedOffers=()=>{const ord=o=>cats().findIndex(c=>c.id===catOfOffer(o).id);return [...offers].sort((a,b)=>((a.status==='paused')-(b.status==='paused'))||(ord(a)-ord(b))||byName(a,b))};
 const sortedPeople=()=>[...people].sort(byName);
+const payText=o=>o.payout?`${o.payoutSign==='to'?'до ':o.payoutSign==='from'?'от ':''}${fmt(o.payout)}`:'—';
 const canWrite=()=>!!store&&!ro;
 function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,2400)}
 const saveErr=e=>e?.code==='invalid_argument'?'Не сохранилось: у вас нет прав менять эту таблицу.':e?.code==='quota_exceeded'?'Таблица переполнена: удалите старые записи.':'Не сохранилось, попробуйте ещё раз.';
@@ -524,7 +525,7 @@ function offerCard(o){
   const t=catOfOffer(o),paused=o.status==='paused';
   return `<button type="button" class="card ocard${paused?' paused':''}" data-offer="${esc(o.id)}" style="${cvar(t)}">
     <span class="o-top"><span class="oic">${esc(t.short||catName(t).slice(0,2))}</span><span class="o-nm">${esc(o.name)||'Без названия'}</span><span class="pill ${paused?'':'done'}">${paused?'Пауза':'Активен'}</span></span>
-    <span class="o-pay">${o.payout?fmt(o.payout):'—'}<small>за клиента</small></span>
+    <span class="o-pay">${payText(o)}<small>за клиента</small></span>
     ${o.action?`<span class="o-ka">КД: ${esc(o.action)}</span>`:''}
     ${stats3(offerClients(o))}
   </button>`;
@@ -645,12 +646,12 @@ function footClient(){
 }
 function fillOffers(type,selId,legacy){
   const list=sortedOffers().filter(o=>!catById(o.cat)||o.cat===type), sel=$('#fOffer');
-  sel.innerHTML='<option value="">Без оффера</option>'+list.map(o=>`<option value="${esc(o.id)}">${esc(o.name)}${o.status==='paused'?' (пауза)':''}${o.payout?' · '+fmt(o.payout):''}</option>`).join('')
+  sel.innerHTML='<option value="">Без оффера</option>'+list.map(o=>`<option value="${esc(o.id)}">${esc(o.name)}${o.status==='paused'?' (пауза)':''}${o.payout?' · '+payText(o):''}</option>`).join('')
     +(legacy?`<option value="legacy">${esc(legacy)}</option>`:'');
   sel.dataset.legacy=legacy||'';
   sel.value=list.some(o=>o.id===selId)?selId:(legacy&&(!selId||selId==='legacy')?'legacy':'');
 }
-function applyOffer(){const o=offerById($('#fOffer').value);if(!o)return;if(o.payout)$('#fPay').value=o.payout;if(o.action)$('#fKa').value=o.action}
+function applyOffer(){const o=offerById($('#fOffer').value);if(!o)return;if(o.payoutBase||o.payout)$('#fPay').value=o.payoutBase||o.payout;if(o.action)$('#fKa').value=o.action}
 async function saveClient(){
   const err=$('#formErr'),name=$('#fName').value.trim();
   err.textContent='';
@@ -686,7 +687,7 @@ function sheetOfferView(){
   $('#sheetBody').innerHTML=`<div class="ohero grad" style="${cvar(t)}">
       <div class="row"><span class="badge">${esc(catName(t))}</span><span class="badge">${paused?'На паузе':'Активен'}</span></div>
       <h3>${esc(o.name)||'Без названия'}</h3>
-      <div class="big">${o.payout?fmt(o.payout):'—'}<small>нам за клиента</small></div>
+      <div class="big">${payText(o)}<small>нам за клиента</small></div>
     </div>
     <dl class="facts">
       <div><dt>Срок на КД</dt><dd>${o.days?days(+o.days):`${days(+t.days||30)} <small>как у категории</small>`}</dd></div>
@@ -757,6 +758,7 @@ async function saveOffer(){
     if(id){
       const old=offerById(id);
       if(old&&body.url!==(old.url||''))body.links=[];
+      if(old&&body.payout!==(+old.payout||0)){body.payoutSign='';body.payoutBase=0}
       if(old&&old.name!==name)for(const r of clients.filter(r=>!r.offerId&&offerOf(r)===old))await store.update('clients',r.id,{offerId:id,offer:name});
       await store.update('offers',id,body);toast('Оффер сохранён');
     }else{id=(await store.add('offers',{...body,createdAt:Date.now()})).id;toast('Оффер добавлен')}
@@ -801,10 +803,11 @@ async function savePerson(){
 /* ---------- RKO Group API: работает вне Claude (внутри Claude страницам закрыты запросы к другим сайтам) ---------- */
 const RKO_BASE='https://rko-group.ru/api/app/v1', RKO_KEY='offers-tracker:rkoKey', RKO_STATE='offers-tracker:rko';
 const PALETTE=['#0e9f9a','#e0407b','#c08a00','#4f6bed','#d9622b','#8a5cf6'];
-const CAT_RX=[['rko',/рко|расч[её]тн|rko/i],['credit',/кредит|credit/i],['debit',/дебет|debit|карт|card/i],['bet',/букмек|ставк|(^|[^а-яё])бк([^а-яё]|$)|bet/i]];
+const CAT_RX=[['rko',/рко|rko|расч[её]тн/i],['debit',/дебет/i],['credit',/кредитн\S*\s+карт/i],['bet',/bet|ставк|winline|марафон|^pari$|букмек/i]];
 let rkoSyncing=false, rkoMsg='', newCats=[];
 const rkoInflight=new Set(), rkoDetailFailed=new Set();
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const hash=s=>{let h=5381;for(const ch of String(s||''))h=(h*33+ch.charCodeAt(0))>>>0;return h.toString(36)};
 const rkoKey=()=>{try{return localStorage.getItem(RKO_KEY)||''}catch(e){return ''}};
 function rkoSetKey(k){try{k?localStorage.setItem(RKO_KEY,k):localStorage.removeItem(RKO_KEY)}catch(e){}}
 const rkoState=()=>{try{return JSON.parse(localStorage.getItem(RKO_STATE)||'{}')}catch(e){return {}}};
@@ -816,6 +819,9 @@ function htmlText(h){
   h=String(h||'').replace(/<br\s*\/?>/gi,'\n').replace(/<\/(p|div|li|h\d|tr)>/gi,'\n').replace(/<li[^>]*>/gi,'• ');
   const t=new DOMParser().parseFromString(h,'text/html').body.textContent||'';
   return t.replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+}
+function richText(s){
+  return htmlText(s).replace(/\\([\\`*_{}\[\]()#+\-.!>~|])/g,'$1').replace(/\*\*|__/g,'').replace(/^#{1,6}\s*/gm,'').replace(/^[ \t]*[-*][ \t]+/gm,'• ').replace(/\n{3,}/g,'\n\n').replace(/\n\n(?=• )/g,'\n').trim();
 }
 async function rko(path,opt={},key=rkoKey()){
   if(!key)throw {code:'no_key',message:'Ключ API не задан'};
@@ -836,49 +842,64 @@ async function rkoAll(path,body){
   }
   return out;
 }
-function catFor(title){
-  const t=String(title||'').trim();
-  for(const [id,rx] of CAT_RX)if(rx.test(t)&&catById(id))return id;
-  if(!t)return cats()[0].id;
-  const same=[...cats(),...newCats].find(c=>catName(c).toLowerCase()===t.toLowerCase());
+function catFor(title,create){
+  const t=String(title||'').trim(),lc=t.toLowerCase();
+  const same=t&&[...cats(),...newCats].find(c=>catName(c).toLowerCase()===lc);
   if(same)return same.id;
+  for(const [id,rx] of CAT_RX)if(rx.test(t)&&catById(id))return id;
+  if(!create)return null;
+  if(!t)return cats()[0].id;
   const c={id:'r'+uid(),name:t,short:t.replace(/[^0-9A-Za-zА-Яа-яЁё]/g,'').slice(0,3).toUpperCase()||'•',color:PALETTE[(cats().length+newCats.length)%PALETTE.length],days:30,hint:''};
   newCats.push(c);return c.id;
 }
 async function saveNewCats(){if(!newCats.length)return;const c=[...cats(),...newCats];newCats=[];await store.set('config','main',{...(cfgRaw||{}),categories:c})}
 function cpaRate(u){
-  const acts=u?.actions||[], fixed=acts.filter(a=>a.reward_type!=='percent').map(a=>Number(a.reward)||0), dp=u?.display_price;
-  return {payout:dp&&dp.unit==='rub'?Number(dp.value)||0:(fixed.length?Math.max(...fixed):0),
-    action:acts.map(a=>`${a.target_action?.title||'Целевое действие'}${a.is_required===false?' (по желанию)':''} — ${a.reward_type==='percent'?`${Number(a.reward)}%`:fmt(a.reward)}`).join('\n')};
+  const acts=u?.actions||[],dp=u?.display_price,fixed=acts.filter(a=>a.reward_type!=='percent'),rub=dp&&dp.unit==='rub';
+  return {payout:rub?Number(dp.value)||0:fixed.reduce((m,a)=>Math.max(m,Number(a.reward)||0),0),sign:rub&&dp.sign!=='eq'?dp.sign:'',
+    base:fixed.filter(a=>a.is_required!==false).reduce((s,a)=>s+(Number(a.reward)||0),0),
+    action:acts.map(a=>{const r=a.reward_type==='percent'?`${Number(a.reward)}%`:(Number(a.reward)?fmt(a.reward):'');
+      return `${String(a.target_action?.title||'Целевое действие').trim()}${a.is_required===false?' (доп.)':''}${r?' — '+r:''}`}).join('\n')};
 }
 async function syncOffers(){
   const ups=[];
   const cpa=await rkoAll('/offer/list',{filter:{state:{open:true,paused:true,archived:false}}});
+  const cpaIds=new Set(cpa.map(o=>o.uuid));
+  const betMain=new Set(cpa.filter(o=>CAT_RX[3][1].test(o.category?.title||'')).map(o=>o.category?.main_id).filter(v=>v!=null));
   for(const o of cpa){
     if(!o.user_rate)continue;
-    const id='rko-'+o.uuid,cur=offerById(id),r=cpaRate(o.user_rate),cf=o.configuration||{};
-    const data={name:o.title||'Оффер',status:o.state==='open'?'active':'paused',payout:r.payout,action:r.action,
+    const id='rko-'+o.uuid,cur=offerById(id);
+    const cat=cur?'':catFor(o.category?.title)||(betMain.has(o.category?.main_id)&&catById('bet')?'bet':'');
+    if(!cur&&!cat)continue;
+    const r=cpaRate(o.user_rate),cf=o.configuration||{};
+    const data={name:String(o.title||'Оффер').trim(),status:o.state==='open'?'active':'paused',payout:r.payout,payoutSign:r.sign,payoutBase:r.base,action:r.action,
       hold:cf.hold_days!=null?days(cf.hold_days):'',network:['RKO Group · CPA',o.advertiser?.title].filter(Boolean).join(' · '),
       rko:{kind:'cpa',uuid:o.uuid,detailed:!!cur?.rko?.detailed}};
     if(!cur?.rko?.detailed)data.terms=[o.access_level==='requested_approval'?'Нужно запросить доступ к офферу в кабинете RKO Group.':'',
       cf.max_processing_days?`Рекламодатель обрабатывает заявку до ${days(cf.max_processing_days)}.`:'',
       cf.cookie_ttl_days?`Cookie живёт ${days(cf.cookie_ttl_days)}.`:''].filter(Boolean).join('\n');
-    ups.push({id,data,init:cur?{}:{cat:catFor(o.category?.title),days:'',url:'',notes:'',createdAt:Date.now()}});
+    ups.push({id,data,init:cur?{}:{cat,days:'',url:'',notes:'',createdAt:Date.now()}});
   }
   let prods=null;
   try{prods=await rko('/offer-ag/products')}catch(e){if(e.code!==403)throw e}
   for(const p of prods?[...(prods.banks||[]),...(prods.others||[])]:[]){
     if(p.external_url)continue;
+    const pcat=catFor(p.short_title)||catFor(p.title)||(/^rko$/i.test(p.alias||'')&&catById('rko')?'rko':'');
+    if(!pcat&&!offers.some(o=>o.rko?.kind==='ag'&&o.rko.product===p.id))continue;
     let d;try{d=await rko('/offer-ag/offers',{body:{product_id:p.id}})}catch(e){if([403,404,422].includes(e.code))continue;throw e}
     for(const g of d?.groups||[])for(const x of g.offers||[]){
-      const id=`rkoag-${p.id}-${g.bank?.id}-${x.channel?.id??0}-${x.company_type??0}`,rw=x.reward||{},rq=x.requirements||{},pct=rw.currency==='PERCENT';
-      const act=pct?`${Number(rw.value)}% вознаграждения`:[rw.open?`открытие ${fmt(rw.open)}`:'',rw.activation?`активация ${fmt(rw.activation)}`:''].filter(Boolean).join(' + ')||rw.text||'';
-      const data={name:`${g.bank?.title||'Банк'} — ${x.label||p.short_title||p.title}`,status:x.active?'active':'paused',payout:pct?0:Number(rw.value)||0,
-        action:act?act[0].toUpperCase()+act.slice(1):'',network:'RKO Group · агентская заявка',rko:{kind:'ag',product:p.id,bank:g.bank?.id,channel:x.channel?.id??0},
-        terms:[p.title,x.label,{1:'Только ООО',2:'Только ИП'}[x.company_type]||'',rq.geo?'Открытие в офисе банка':'',rq.field_service?'Есть выезд к клиенту':'',
-          rq.video?'Можно по видеовстрече':'',rq.scan?'Нужны сканы документов':'',rq.agreement?'Нужно согласие клиента на обработку данных':'',x.channel?.name?`Канал: ${x.channel.name}`:''].filter(Boolean).join('\n')};
-      if(x.external_link?.enabled&&x.external_link.url)data.url=x.external_link.url;
-      ups.push({id,data,init:offerById(id)?{}:{cat:catFor(p.short_title||p.title),days:'',hold:'',url:'',notes:'',createdAt:Date.now()}});
+      const ext=x.external_link?.enabled?String(x.external_link.url||''):'';
+      if([...cpaIds].some(u=>ext.includes(u)))continue;
+      const id=`rkoag-${p.id}-${g.bank?.id}-${x.channel?.id??0}-${x.company_type??0}-${hash(x.label)}`,cur=offerById(id);
+      if(!cur&&!pcat)continue;
+      const rw=x.reward||{},rq=x.requirements||{},pct=rw.currency==='PERCENT',opn=Number(rw.open)||0,actv=Number(rw.activation)||0;
+      const data={name:`${String(g.bank?.title||'Банк').trim()} — ${String(x.label||p.short_title||p.title||'').trim()}`,status:x.active?'active':'paused',
+        payout:pct?0:Number(rw.value)||0,payoutSign:pct?'':/^\s*до/i.test(rw.text||'')?'to':/^\s*от/i.test(rw.text||'')?'from':'',payoutBase:opn+actv,
+        action:pct?`${Number(rw.value)}% вознаграждения`:[opn?`Открытие — ${fmt(opn)}`:'',actv?`Активация — ${fmt(actv)}`:''].filter(Boolean).join('\n'),
+        network:`RKO Group · ${x.channel?.name||'агентская заявка'}`,rko:{kind:'ag',product:p.id,bank:g.bank?.id,channel:x.channel?.id??0},
+        terms:[p.title,String(x.label||'').trim(),{1:'Только ООО',2:'Только ИП'}[x.company_type]||'',rq.geo?'Открытие в офисе банка':'',rq.field_service?'Есть выезд к клиенту':'',
+          rq.video?'Можно по видеовстрече':'',rq.scan?'Нужны сканы документов':'',rq.agreement?'Нужно согласие клиента на обработку данных':''].filter(Boolean).join('\n')};
+      if(ext)data.url=ext.startsWith('/')?'https://rko-group.ru'+ext:ext;
+      ups.push({id,data,init:cur?{}:{cat:pcat,days:'',hold:'',url:'',notes:'',createdAt:Date.now()}});
     }
   }
   await saveNewCats();
@@ -896,7 +917,7 @@ async function syncRequests(){
         paid:(q.income?.items||[]).some(i=>['paid','settled_externally'].includes(i.settlement?.state)),
         payout:Number(q.income?.total)||(q.status?.is_end?0:cur?.payout||off?.payout||0),
         rko:{kind:'request',id:q.id,status:q.status?.title||'',end:!!q.status?.is_end}},
-      init:cur?{}:{type:catFor(prod),person:'',action:off?.action||'',createdAt:Date.now(),
+      init:cur?{}:{type:catFor(prod,true),person:'',action:off?.action||'',createdAt:Date.now(),
         data:[q.company?.inn?`ИНН ${q.company.inn}`:'',q.company?.title?ct.name:'',ct.phone,ct.email,`Заявка №${q.id} в RKO Group`].filter(Boolean).join('\n')}};
   });
   await saveNewCats();
@@ -928,7 +949,7 @@ async function maybeDetail(o){
       try{const g=await rko(`/offer/get-links?o=${encodeURIComponent(o.rko.uuid)}&l=${encodeURIComponent(l.uuid)}`);if(g?.short)links.push({title:l.title||'',url:g.short})}catch(e){}
     }
     const forb=(d?.words?.forbidden||[]).map(w=>w.word).filter(Boolean);
-    const terms=[htmlText(d?.short_description),htmlText(d?.description),o.terms,forb.length?`Запрещено в рекламе: ${forb.join(', ')}`:''].filter(Boolean).join('\n\n');
+    const terms=[richText(d?.short_description),richText(d?.description),o.terms,forb.length?`Запрещено в рекламе: ${forb.join(', ')}`:''].filter(Boolean).join('\n\n');
     await store.update('offers',o.id,{terms,links,url:links[0]?.url||o.url||'',rko:{...o.rko,detailed:true}});
   }catch(e){
     rkoDetailFailed.add(o.id);
@@ -949,6 +970,7 @@ function renderRko(){
   let h='<h2>RKO Group</h2>';
   if(!store.local)h+='<p class="note">Подключение к RKO Group работает в версии трекера на GitHub. Внутри Claude страницам закрыты запросы к другим сайтам.</p>';
   else if(!rkoKey())h+=`<p class="note">Подключите API, и трекер сам подтянет офферы со ставками, условиями и ссылками, ваши заявки со статусами и выплатами, баланс.</p>
+    <p class="note">Офферы берутся только по вашим категориям: РКО, дебетовые и кредитные карты, букмекеры. Нужны другие, например «Микрозаймы»? Добавьте категорию с тем же названием, как в RKO Group.</p>
     <label class="f">API-ключ<input id="rkoKeyIn" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="rkoa_…"></label>
     <p class="err" id="rkoErr"></p>
     <div class="actions"><button class="btn black" type="button" data-rko="connect">Подключить</button></div>
@@ -957,7 +979,8 @@ function renderRko(){
     ${b?`<div class="ministats"><span>Доступно<b>${money(b.balance_rubles)}</b></span><span>В холде<b>${money(b.balance_hold_rubles)}</b></span><span>Ждёт подтверждения<b>${money(b.balance_pending_rubles)}</b></span><span>В выводе<b>${money(b.balance_withdraw_rubles)}</b></span></div>`:''}
     <p class="err">${esc(st.error||'')}</p><p class="note" id="rkoMsg">${esc(rkoMsg)}</p>
     <div class="actions"><button class="btn black" type="button" data-rko="sync"${rkoSyncing?' disabled':''}>Обновить всё</button><button class="btn ghost-danger" type="button" data-rko="disconnect">Отключить</button></div>
-    <p class="note">Офферы и заявки обновляются сами при открытии трекера, не чаще раза в 15 минут. Ваши заметки и «Кто ведёт» при обновлении не стираются.</p>`;
+    <p class="note">Офферы и заявки обновляются сами при открытии трекера, не чаще раза в 15 минут. Ваши заметки и «Кто ведёт» при обновлении не стираются.</p>
+    <p class="note">Офферы берутся только по вашим категориям. Нужны другие, например «Микрозаймы»? Добавьте категорию с тем же названием, как в RKO Group, и нажмите «Обновить всё».</p>`;
   p.innerHTML=h;
 }
 async function rkoConnect(btn){

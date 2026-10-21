@@ -17,15 +17,15 @@
 :root{
   --bg:#ffffff; --surface:#ffffff; --soft:#f2f2f3; --ink:#0b0b0c; --muted:#6e6e73; --line:#e8e8ea;
   --hero:#0b0b0c; --hero-fg:#ffffff; --hero-muted:#9a9aa0; --hero-line:#2a2a2e;
-  --ok:#12a35e; --warn:#b86e00; --bad:#e5383b; --scrim:rgba(11,11,12,.45); --shadow:rgba(11,11,12,.14);
+  --ok:#12a35e; --warn:#b86e00; --bad:#e5383b; --rko:#6f3ff5; --scrim:rgba(11,11,12,.45); --shadow:rgba(11,11,12,.14);
   --f:"Manrope",-apple-system,"SF Pro Display","Segoe UI",system-ui,sans-serif;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#050506; --surface:#121214; --soft:#1c1c1f; --ink:#f4f4f5; --muted:#9a9aa0; --line:#26262a;
-  --hero:#121214; --hero-line:#2a2a2e; --ok:#2fcf82; --warn:#ffb340; --bad:#ff5c5f; --scrim:rgba(0,0,0,.62); --shadow:rgba(0,0,0,.5); color-scheme:dark}}
+  --hero:#121214; --hero-line:#2a2a2e; --ok:#2fcf82; --warn:#ffb340; --bad:#ff5c5f; --rko:#a98bff; --scrim:rgba(0,0,0,.62); --shadow:rgba(0,0,0,.5); color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#050506; --surface:#121214; --soft:#1c1c1f; --ink:#f4f4f5; --muted:#9a9aa0; --line:#26262a;
-  --hero:#121214; --hero-line:#2a2a2e; --ok:#2fcf82; --warn:#ffb340; --bad:#ff5c5f; --scrim:rgba(0,0,0,.62); --shadow:rgba(0,0,0,.5); color-scheme:dark}
+  --hero:#121214; --hero-line:#2a2a2e; --ok:#2fcf82; --warn:#ffb340; --bad:#ff5c5f; --rko:#a98bff; --scrim:rgba(0,0,0,.62); --shadow:rgba(0,0,0,.5); color-scheme:dark}
 *{box-sizing:border-box}
 html.locked{overflow:hidden}
 body{background:var(--bg);color:var(--ink);font-family:var(--f);font-size:15px;line-height:1.45;font-weight:500;-webkit-tap-highlight-color:transparent}
@@ -70,6 +70,7 @@ main.in{display:grid;gap:16px;padding-block:18px calc(120px + env(safe-area-inse
 .catcard[aria-pressed="true"]{box-shadow:inset 0 0 0 2px #fff,0 0 0 3px var(--c)}
 .catcard .t{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px}
 .catcard .ic{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.95);color:var(--c);display:grid;place-items:center;font-weight:800;font-size:11.5px}
+.ic svg,.oic svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .catcard .nm,.catcard .cnt{font-size:16px;font-weight:800;overflow-wrap:anywhere}
 .catcard .cnt{font-variant-numeric:tabular-nums}
 .catcard .st{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding-top:10px;border-top:1px solid rgba(255,255,255,.16)}
@@ -118,6 +119,11 @@ button.card{width:100%;text-align:left;color:inherit;font:inherit}
 .ka{font-size:13.5px;overflow-wrap:anywhere}
 .ka span{color:var(--muted)}
 .data{font-size:13.5px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
+.c-who{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:0 16px 12px}
+.c-who>span{font-size:12.5px;color:var(--muted);font-weight:600;margin-right:2px}
+.who{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 14px;min-height:38px;font-weight:700;font-size:13.5px}
+.who[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.who:disabled{opacity:.6;cursor:default}
 .c-foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 16px 14px;border-top:1px solid var(--line)}
 .pay{font-weight:800;font-size:16px;font-variant-numeric:tabular-nums;white-space:nowrap;margin-right:auto}
 .toggle{display:inline-flex;align-items:center;gap:7px;border:0;background:var(--soft);color:var(--muted);padding:9px 13px;min-height:42px;border-radius:999px;font-size:13.5px;font-weight:700;white-space:nowrap}
@@ -139,6 +145,11 @@ button.card{width:100%;text-align:left;color:inherit;font:inherit}
 .stats3 span{font-size:12px;color:var(--muted);display:grid;gap:1px;min-width:0}
 .stats3 b{font-size:14.5px;color:var(--ink);font-weight:800;font-variant-numeric:tabular-nums}
 .ocard.paused .o-nm,.ocard.paused .o-pay{opacity:.55}
+.o-nmw{display:grid;gap:5px;justify-items:start;min-width:0}
+.srcb{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;color:var(--rko);background:color-mix(in srgb,var(--rko) 13%,var(--surface));padding:3px 8px;border-radius:999px;white-space:nowrap}
+.srcb::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.chip.rk .sw{background:var(--rko)}
+.fromrko{font-size:13px;color:var(--rko);font-weight:700;margin:0;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--rko) 10%,var(--surface))}
 
 .pcard{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;align-items:center;padding:14px 16px}
 .pcard .av{width:44px;height:44px;font-size:15px;grid-row:span 2}
@@ -344,6 +355,25 @@ const DEFAULT_CATS=[
 const LATE_BEFORE=5;
 const TABS={clients:'Клиенты',offers:'Офферы',team:'Команда',setup:'Настройки'};
 const LAST_PERSON='offers-tracker:lastPerson';
+const DEFAULT_PEOPLE=['Егор','Даня'];
+const ICONS={
+  bank:['Счёт','<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3 13h18M11 13v2h2v-2"/>'],
+  card:['Дебетовая карта','<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/>'],
+  credit:['Кредитная карта','<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19M14 16.5l4-4.5"/><circle cx="14.4" cy="12.6" r=".9"/><circle cx="17.6" cy="16" r=".9"/>'],
+  ball:['Ставки','<circle cx="12" cy="12" r="9"/><path d="M12 7.5l3.8 2.8-1.5 4.4H9.7l-1.5-4.4zM12 3v4.5M15.8 10.3l4.6-1.6M14.3 14.7l2.8 3.9M9.7 14.7l-2.8 3.9M8.2 10.3 3.6 8.7"/>'],
+  coins:['Деньги','<ellipse cx="12" cy="6.5" rx="7" ry="3"/><path d="M5 6.5v5.5c0 1.7 3.1 3 7 3s7-1.3 7-3V6.5M5 12v5.5c0 1.7 3.1 3 7 3s7-1.3 7-3V12"/>'],
+  doc:['Документы','<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h4"/>'],
+  home:['Недвижимость','<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>'],
+  star:['Другое','<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>']
+};
+function iconFor(c){
+  if(ICONS[c?.icon])return c.icon;
+  const by={rko:'bank',debit:'card',credit:'credit',bet:'ball'}[c?.id];if(by)return by;
+  const n=String(c?.name||'').toLowerCase();
+  return /рко|сч[её]т|бизнес/.test(n)?'bank':/кредитн.*карт/.test(n)?'credit':/дебет|карт/.test(n)?'card':/бет|ставк|букмек/.test(n)?'ball'
+    :/займ|кредит|вклад|деньг|финанс/.test(n)?'coins':/регистр|документ|юрид/.test(n)?'doc':/ипотек|недвиж|дом|жиль/.test(n)?'home':'star';
+}
+const icon=c=>`<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[iconFor(c)][1]}</svg>`;
 
 /* ---------- хранилище: Claude db или локальный браузер ---------- */
 function localStore(){
@@ -395,7 +425,7 @@ const fdate=d=>esc(fdateRaw(d));
 let store=null, ro=false, blocked='', downloads=null;
 let loaded={clients:false,offers:false,people:false};
 let clients=[], offers=[], people=[], cfgRaw=null;
-let tab='clients', f={cat:'',status:'all',q:'',person:'',offer:''}, oCat='';
+let tab='clients', f={cat:'',status:'all',q:'',person:'',offer:''}, oCat='', oSrc=false;
 let sheet=null, opener=null, catDraft=null;
 
 const cats=()=>Array.isArray(cfgRaw?.categories)&&cfgRaw.categories.length?cfgRaw.categories:DEFAULT_CATS;
@@ -415,6 +445,13 @@ function daysLeft(r){const d=daysSince(r.date);return d==null?null:windowOf(r)-d
 const isLate=r=>{const l=daysLeft(r);return status(r)==='wait'&&l!=null&&l<=LATE_BEFORE};
 const sortedOffers=()=>{const ord=o=>cats().findIndex(c=>c.id===catOfOffer(o).id);return [...offers].sort((a,b)=>((a.status==='paused')-(b.status==='paused'))||(ord(a)-ord(b))||byName(a,b))};
 const sortedPeople=()=>[...people].sort(byName);
+const teamChoices=()=>[...DEFAULT_PEOPLE.filter(n=>!people.some(p=>p.name===n)).map(n=>({id:'new:'+n,name:n})),...sortedPeople().map(p=>({id:p.id,name:p.name}))]
+  .sort((a,b)=>(DEFAULT_PEOPLE.indexOf(a.name)+1||99)-(DEFAULT_PEOPLE.indexOf(b.name)+1||99)||a.name.localeCompare(b.name,'ru'));
+async function personIdFor(v){
+  if(!String(v).startsWith('new:'))return v;
+  const name=v.slice(4),ex=people.find(p=>p.name===name);
+  return ex?ex.id:(await store.add('people',{name,contact:'',note:'',createdAt:Date.now()})).id;
+}
 const payText=o=>o.payout?`${o.payoutSign==='to'?'до ':o.payoutSign==='from'?'от ':''}${fmt(o.payout)}`:'—';
 const canWrite=()=>!!store&&!ro;
 function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,2400)}
@@ -481,11 +518,12 @@ function clientCard(r){
   return `<article class="card client${late?' is-late':''}" data-id="${esc(r.id)}">
     <button type="button" class="open" data-a="edit">
       <span class="c-top"><span class="name">${esc(r.name)||'Без имени'}${r.example?'<span class="example">пример</span>':''}</span><span class="pill ${pill[0]}">${pill[1]}</span></span>
-      <span class="meta"><span class="tag k" style="${cvar(t)}">${esc(catName(t))}</span>${on?`<span class="tag">${esc(on)}</span>`:''}${p?`<span class="tag"><span class="av sm">${esc(initials(p.name))}</span>${esc(p.name)}</span>`:'<span class="tag none">Никто не ведёт</span>'}${r.rko?.status&&!closed?`<span class="tag">RKO: ${esc(r.rko.status)}</span>`:''}</span>
+      <span class="meta"><span class="tag k" style="${cvar(t)}">${esc(catName(t))}</span>${on?`<span class="tag">${esc(on)}</span>`:''}${r.rko?.status&&!closed?`<span class="tag">RKO: ${esc(r.rko.status)}</span>`:''}</span>
       <span class="when${late?' late':''}">${fdate(r.date)}${w?' · '+w:''}</span>
       ${r.action?`<span class="ka"><span>КД:</span> ${esc(r.action)}</span>`:''}
       ${r.data?`<span class="data">${esc(r.data)}</span>`:''}
     </button>
+    <div class="c-who" role="group" aria-label="Кто ведёт"><span>Ведёт</span>${teamChoices().map(x=>`<button type="button" class="who" data-who="${esc(x.id)}" aria-pressed="${!!p&&p.id===x.id}"${off}>${esc(x.name)}</button>`).join('')}</div>
     <div class="c-foot">
       <span class="pay">${r.payout?fmt(r.payout):'—'}</span>
       <button type="button" class="toggle ${r.kd?'kd-on':(late?'late':'')}" data-t="kd" aria-pressed="${!!r.kd}"${off}><span class="dot"></span>КД: ${r.kd?'да':'нет'}</button>
@@ -498,7 +536,7 @@ function renderClients(){
   if(f.person&&f.person!=='none'&&loaded.people&&!personById(f.person))f.person='';
   $('#cats').innerHTML=cats().map(t=>{const s=sums(clients.filter(r=>typeOf(r)===t.id));
     return `<button type="button" class="catcard grad" style="${cvar(t)}" data-cat="${esc(t.id)}" aria-pressed="${f.cat===t.id}">
-      <span class="t"><span class="ic">${esc(t.short||catName(t).slice(0,2))}</span><span class="nm">${esc(catName(t))}</span><span class="cnt">${s.n}</span></span>
+      <span class="t"><span class="ic">${icon(t)}</span><span class="nm">${esc(catName(t))}</span><span class="cnt">${s.n}</span></span>
       <span class="st"><span>Ждут КД<b>${s.wait}</b></span><span>Ждём<b>${fmt(s.due)}</b></span><span>Выплачено<b>${fmt(s.paid)}</b></span></span>
     </button>`}).join('');
   const scope=f.cat?clients.filter(r=>typeOf(r)===f.cat):clients, s=sums(scope);
@@ -524,7 +562,7 @@ const offerClients=o=>clients.filter(r=>offerOf(r)===o);
 function offerCard(o){
   const t=catOfOffer(o),paused=o.status==='paused';
   return `<button type="button" class="card ocard${paused?' paused':''}" data-offer="${esc(o.id)}" style="${cvar(t)}">
-    <span class="o-top"><span class="oic">${esc(t.short||catName(t).slice(0,2))}</span><span class="o-nm">${esc(o.name)||'Без названия'}</span><span class="pill ${paused?'':'done'}">${paused?'Пауза':'Активен'}</span></span>
+    <span class="o-top"><span class="oic">${icon(t)}</span><span class="o-nmw"><span class="o-nm">${esc(o.name)||'Без названия'}</span>${o.rko?'<span class="srcb">RKO Group</span>':''}</span><span class="pill ${paused?'':'done'}">${paused?'Пауза':'Активен'}</span></span>
     <span class="o-pay">${payText(o)}<small>за клиента</small></span>
     ${o.action?`<span class="o-ka">КД: ${esc(o.action)}</span>`:''}
     ${stats3(offerClients(o))}
@@ -532,9 +570,11 @@ function offerCard(o){
 }
 function renderOffers(){
   if(oCat&&!catById(oCat))oCat='';
-  $('#offerChips').innerHTML=`<button type="button" class="chip" data-ocat="" aria-pressed="${!oCat}">Все<span class="c">${offers.length}</span></button>`
+  const nr=offers.filter(o=>o.rko).length;if(!nr)oSrc=false;
+  $('#offerChips').innerHTML=`<button type="button" class="chip" data-ocat="" aria-pressed="${!oCat&&!oSrc}">Все<span class="c">${offers.length}</span></button>`
+    +(nr?`<button type="button" class="chip rk" data-osrc="1" aria-pressed="${oSrc}"><span class="sw"></span>RKO Group<span class="c">${nr}</span></button>`:'')
     +cats().map(t=>`<button type="button" class="chip" data-ocat="${esc(t.id)}" style="${cvar(t)}" aria-pressed="${oCat===t.id}"><span class="sw"></span>${esc(catName(t))}<span class="c">${offers.filter(o=>catOfOffer(o).id===t.id).length}</span></button>`).join('');
-  const list=sortedOffers().filter(o=>!oCat||catOfOffer(o).id===oCat);
+  const list=sortedOffers().filter(o=>(!oCat||catOfOffer(o).id===oCat)&&(!oSrc||o.rko));
   $('#offerList').innerHTML=list.map(offerCard).join('');
   let em=emptyMsg('offers','офферы');
   if(!em&&!list.length)em=offers.length?'<b>В этой категории офферов нет</b>Выберите другую категорию или добавьте оффер.':`<b>Офферов пока нет</b>${canWrite()?'Нажмите «Добавить оффер» и впишите условия, выплату и ссылку.':''}`;
@@ -561,7 +601,7 @@ function renderSetup(){
   const list=catDraft||cats();
   $('#catRows').innerHTML=list.map((c,i)=>`<div class="srow" data-i="${i}">
     <div class="srow-top"><input type="color" data-k="color" value="${esc(hex6(c.color))}" id="cc-${i}" aria-label="Цвет категории"><input data-k="name" value="${esc(c.name)}" id="cn-${i}" placeholder="Название" aria-label="Название категории"><button type="button" class="btn sm ghost-danger" data-del="${i}">Удалить</button></div>
-    <div class="two"><label class="f">Значок<input data-k="short" maxlength="3" value="${esc(c.short)}" id="cs-${i}"></label><label class="f">Срок КД, дней<input data-k="days" type="number" inputmode="numeric" min="1" value="${esc(c.days)}" id="cd-${i}"></label></div>
+    <div class="two"><label class="f">Иконка<select data-k="icon" id="ci-${i}">${Object.entries(ICONS).map(([k,v])=>`<option value="${k}"${iconFor(c)===k?' selected':''}>${v[0]}</option>`).join('')}</select></label><label class="f">Срок КД, дней<input data-k="days" type="number" inputmode="numeric" min="1" value="${esc(c.days)}" id="cd-${i}"></label></div>
     <label class="f">КД по умолчанию<input data-k="hint" value="${esc(c.hint)}" id="ch-${i}"></label>
   </div>`).join('')||'<p class="note">Категорий нет. Добавьте хотя бы одну.</p>';
   $('#catDirty').hidden=!catDraft;
@@ -626,8 +666,9 @@ function sheetClient(){
   </fieldset><p class="err" id="formErr"></p></form>`;
   let last='';try{last=localStorage.getItem(LAST_PERSON)||''}catch(e){}
   const pid=r?(r.person||''):(sheet.person||last);
-  $('#fPerson').innerHTML='<option value="">Никто не назначен</option>'+sortedPeople().map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')+'<option value="__new">+ Новый человек…</option>';
-  $('#fPerson').value=personById(pid)?pid:'';
+  const ch=teamChoices();
+  $('#fPerson').innerHTML='<option value="">Никто не назначен</option>'+ch.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')+'<option value="__new">+ Новый человек…</option>';
+  $('#fPerson').value=ch.some(c=>c.id===pid)?pid:'';
   fillOffers(type,r?offerOf(r)?.id||'':(sheet.offerId||''),r&&!offerOf(r)?r.offer||'':'');
   $('#fName').value=r?.name||'';
   $('#fDate').value=r?.date||today();
@@ -665,6 +706,7 @@ async function saveClient(){
       if(!sheet.newPerson)sheet.newPerson=(await store.add('people',{name:$('#fPersonNew').value.trim(),contact:'',note:'',createdAt:Date.now()})).id;
       person=sheet.newPerson;
     }
+    if(person.startsWith('new:'))person=await personIdFor(person);
     const ov=$('#fOffer').value,o=offerById(ov);
     const body={type:picked('ftype'),name,person,offerId:o?o.id:'',offer:o?o.name:(ov==='legacy'?$('#fOffer').dataset.legacy:''),
       date:$('#fDate').value,payout:Number($('#fPay').value)||0,data:$('#fData').value.trim(),action:$('#fKa').value.trim(),
@@ -685,7 +727,7 @@ function sheetOfferView(){
   const t=catOfOffer(o),paused=o.status==='paused',list=offerClients(o);
   const links=(Array.isArray(o.links)&&o.links.length?o.links:[{title:'',url:o.url}]).map(l=>({title:String(l.title||''),url:linkOf(l.url)})).filter(l=>l.url);
   $('#sheetBody').innerHTML=`<div class="ohero grad" style="${cvar(t)}">
-      <div class="row"><span class="badge">${esc(catName(t))}</span><span class="badge">${paused?'На паузе':'Активен'}</span></div>
+      <div class="row"><span class="badge">${esc(catName(t))}</span><span class="badge">${paused?'На паузе':'Активен'}</span>${o.rko?'<span class="badge">Из RKO Group</span>':''}</div>
       <h3>${esc(o.name)||'Без названия'}</h3>
       <div class="big">${payText(o)}<small>нам за клиента</small></div>
     </div>
@@ -720,7 +762,7 @@ function sheetOffer(){
   if(sheet.id&&!o){closeSheet();return}
   const type=o?catOfOffer(o).id:(oCat||cats()[0].id),paused=o?.status==='paused';
   $('#sheetTitle').textContent=o?'Изменить оффер':'Новый оффер';
-  $('#sheetBody').innerHTML=`<form id="oForm" class="form" novalidate><fieldset${fs()}>
+  $('#sheetBody').innerHTML=`${o?.rko?'<p class="fromrko">Оффер из RKO Group: название, ставка, условия и ссылки обновляются оттуда и перезапишут ручные правки. Категория и заметки сохранятся.</p>':''}<form id="oForm" class="form" novalidate><fieldset${fs()}>
     <label class="f">Название оффера<input id="oName" autocomplete="off" placeholder="Например, РКО для ИП в банке"></label>
     <div class="typepick" role="radiogroup" aria-label="Категория">${radios('otype',type)}</div>
     <div class="typepick" role="radiogroup" aria-label="Статус">
@@ -826,8 +868,14 @@ function richText(s){
 async function rko(path,opt={},key=rkoKey()){
   if(!key)throw {code:'no_key',message:'Ключ API не задан'};
   let res,j=null;
-  try{res=await fetch(RKO_BASE+path,{method:opt.body?'POST':'GET',headers:{'X-API-Key':key,...(opt.body?{'Content-Type':'application/json'}:{})},body:opt.body?JSON.stringify(opt.body):undefined})}
-  catch(e){throw {code:'network',message:'Нет связи с RKO Group'}}
+  try{res=await fetch(RKO_BASE+path,{method:opt.body?'POST':'GET',headers:{'X-API-Key':key,...(opt.body?{'Content-Type':'application/json'}:{})},
+    body:opt.body?JSON.stringify(opt.body):undefined,signal:AbortSignal.timeout?AbortSignal.timeout(30000):undefined})}
+  catch(e){
+    const m=String(e?.message||'');
+    throw {code:'network',message:e?.name==='TimeoutError'?'RKO Group не ответил за 30 секунд. Попробуйте ещё раз.'
+      :/ISO-8859|Invalid value|header/i.test(m)?'В ключе есть лишние символы. Скопируйте его из кабинета заново.'
+      :'Браузер не достучался до rko-group.ru. Проверьте интернет. Если включены VPN или блокировщик рекламы, отключите их для этой страницы.'};
+  }
   if(res.status===429&&!opt.retried){await sleep(1500);return rko(path,{...opt,retried:true},key)}
   try{j=await res.json()}catch(e){}
   if(!res.ok||j?.error)throw {code:res.status,message:j?.error?.message||`Ошибка ${res.status}`};
@@ -984,14 +1032,14 @@ function renderRko(){
   p.innerHTML=h;
 }
 async function rkoConnect(btn){
-  const k=($('#rkoKeyIn')?.value||'').trim(),err=$('#rkoErr');
+  const raw=$('#rkoKeyIn')?.value||'',m=raw.match(/rkoa_[0-9a-f]{48}/i),k=m?m[0]:raw.replace(/[^\x21-\x7e]/g,''),err=$('#rkoErr');
   if(!k){err.textContent='Вставьте ключ из кабинета RKO Group.';return}
   btn.disabled=true;btn.textContent='Проверяю ключ…';err.textContent='';
   try{
     const pr=await rko('/user/profile',{},k);
     rkoSetKey(k);rkoSave({profile:{name:pr?.name||''},error:'',at:0});renderRko();render();rkoSync();
   }catch(e){
-    err.textContent=e?.code===401?'Ключ не подошёл: проверьте, что он скопирован целиком и не отозван.':(e?.message||'Не удалось проверить ключ');
+    err.textContent=e?.code===401?(m?'Ключ не подошёл: он отозван или истёк. Создайте новый в кабинете RKO Group.':'Ключ не подошёл. Он должен начинаться с rkoa_ и содержать ещё 48 символов.'):(e?.message||'Не удалось проверить ключ');
     btn.disabled=false;btn.textContent='Подключить';
   }
 }
@@ -1019,6 +1067,14 @@ $('#resetF').onclick=()=>{f={cat:'',status:'all',q:'',person:'',offer:''};$('#q'
 $('#clientList').addEventListener('click',async e=>{
   const card=e.target.closest('[data-id]');if(!card)return;
   const id=card.dataset.id,r=clients.find(x=>x.id===id);if(!r)return;
+  const w=e.target.closest('[data-who]');
+  if(w){
+    if(!canWrite())return;
+    w.disabled=true;
+    try{const pid=r.person&&r.person===w.dataset.who?'':await personIdFor(w.dataset.who);await store.update('clients',id,{person:pid});try{localStorage.setItem(LAST_PERSON,pid)}catch(_){}}
+    catch(err){toast(saveErr(err));w.disabled=false}
+    return;
+  }
   const t=e.target.closest('[data-t]');
   if(t){
     if(!canWrite())return;
@@ -1030,7 +1086,9 @@ $('#clientList').addEventListener('click',async e=>{
   if(e.target.closest('[data-a=edit]'))openSheet({kind:'client',id});
 });
 $('#addClient').onclick=()=>openSheet({kind:'client',person:f.person&&f.person!=='none'?f.person:''});
-$('#offerChips').addEventListener('click',e=>{const b=e.target.closest('[data-ocat]');if(!b)return;oCat=b.dataset.ocat;renderOffers()});
+$('#offerChips').addEventListener('click',e=>{
+  if(e.target.closest('[data-osrc]')){oSrc=!oSrc;renderOffers();return}
+  const b=e.target.closest('[data-ocat]');if(!b)return;oCat=b.dataset.ocat;if(!oCat)oSrc=false;renderOffers()});
 $('#offerList').addEventListener('click',e=>{const b=e.target.closest('[data-offer]');if(b)openSheet({kind:'offerView',id:b.dataset.offer})});
 $('#addOffer').onclick=()=>openSheet({kind:'offer'});
 $('#peopleList').addEventListener('click',e=>{const b=e.target.closest('[data-person]');if(!b)return;
